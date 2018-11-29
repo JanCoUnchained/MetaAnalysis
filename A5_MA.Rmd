@@ -1,0 +1,57 @@
+---
+title: "A5_Meta"
+author: "Victor Møller"
+date: "29 nov 2018"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+
+library(pacman)
+p_load(tidyverse, lme4)
+
+```
+
+Things that needs to be looked at / read through: 
+`pitch_f0_variability`, `frequency`, `Title`,  `ACOUST_ANA_DESCR`, `DESCRIPTION`, and `COMMENTS`
+
+```{r cars}
+
+data <- read.csv("Assignment5_MetaAnalysis_SR_SCHIZO.csv")
+
+#a lot of NA - how come? 
+
+```
+
+Features we are interested in: 
+Pitch mean, pitch SD. 
+
+```{r pressure, echo=FALSE}
+
+
+
+```
+
+Calculate effect size & standard error of mean & SD. 
+lmer() first (mixed effects)
+rma() afterwards. 
+
+```{r}
+
+```
+
+Build forest plot:
+(forest(model))
+
+```{r}
+
+```
+
+add study (from assignment 3) 
+
+```{r}
+
+```
+
+
+
