@@ -33,3 +33,32 @@ knitr::opts_chunk$set(echo = TRUE)
 - Go back to Assignment 3, add your own study to the data table, and re-run meta-analysis. Do the results change?
 
 - Now look at the output of rma() and check tau and I2
+
+```{r}
+#STOLEN STRAIGHT FROM MIKKEL, lOl
+
+library(pacman)
+
+
+
+p_load(metafor, tidyverse, caret, lmerTest)
+
+data <- read.csv("Assignment5_MetaAnalysis_SR_SCHIZO.csv")
+
+PitchRange=escalc('SMD', n1i=SAMPLE_SIZE_SZ, n2i=SAMPLE_SIZE_HC, m1i=PITCH_F0_SZ_M,
+m2i=PITCH_F0_HC_M, sd1i=PITCH_F0_SZ_SD, sd2i=PITCH_F0_HC_SD,
+data = data)
+
+PitchRangeSD=escalc('SMD', n1i=SAMPLE_SIZE_SZ, n2i=SAMPLE_SIZE_HC, m1i=PITCH_F0SD_SZ_M,
+m2i=PITCH_F0SD_HC_M, sd1i=PITCH_F0SD_SZ_SD, sd2i=PITCH_F0SD_HC_SD,
+data = data)
+PitchRange <- filter(PitchRange, complete.cases(PitchRange$yi))
+PitchRangeSD <- filter(PitchRangeSD, complete.cases(PitchRangeSD$yi))
+
+colnames(PitchRangeSD)[22] <- "yiSD"
+colnames(PitchRangeSD)[23] <- "viSD"
+
+meta <- dplyr::full_join(PitchRange, PitchRangeSD)
+
+```
+
