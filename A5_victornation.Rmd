@@ -78,6 +78,8 @@ sd_analysis <- meta %>%
 ```
 
 Model for Mean
+--> Effect size around 0.5 - but the SE is very big. 
+--> No conclusive evidence for an effect of mean pitch. 
 
 ```{r}
 library(metafor)
@@ -85,12 +87,13 @@ m1_mean <- lmer(yi ~ 1 + (1|StudyID), weights = 1/vi, data=mean_analysis,
 control=lmerControl(check.nobs.vs.nlev="ignore",
 check.nobs.vs.nRE="ignore"))
 
-m2_mean <- rma(yi, vi, data = mean_analysis, slab=StudyID)
+m2_mean <- rma(yi, vi, data = mean_analysis, slab=Article)
 forest(m2_mean)
 
 ```
 
 Model for SD 
+--> also crosses zero, so no conclusive evidence. 
 
 ```{r}
 
@@ -104,16 +107,23 @@ forest(m2_SD)
 ```
 
 Quality check - Heterogeneity
---> Magnus analysis? 
+--> Very high heterogeneity. 
+--> A lot that is not due to chance. 
 
 ```{r}
 
-confint(m2_mean)
-confint(m2_SD)
+confint(m2_mean, level = .95) #high
+confint(m2_SD, level = .95) #extreme
 
 ```
 
-Influential studies
+Influential studies. 
+
+COHEN: 
+SD in every utterance not across. 
+Figure out why it is very different (is it studying something else).
+--> if not: multiverse analysis --> do the analysis without Cohen (does this change anything). 
+
 
 ```{r}
 
