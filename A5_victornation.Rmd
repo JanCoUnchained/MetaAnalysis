@@ -1,0 +1,144 @@
+---
+title: "Assignment 5 - Meta-analysis of pitch in schizophrenia"
+author: "Riccardo Fusaroli"
+date: "3/7/2017"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Building on the shoulders of giants: meta-analysis
+
+## Questions to be answered
+
+1. What is the current evidence for distinctive patterns of pitch mean and pitch sd in schizophrenia? Report how many papers report quantitative estimates, your method to analyze them, the estimated effect size of the difference (mean effect size and standard error for pitch mean, same for pitch sd) and forest plots representing it. 
+
+2. Do the results match your own analysis from Assignment 3? If you add your results to the meta-analysis, do the estimated effect sizes change? Report the new estimates and the new forest plots.
+
+3. Assess the quality of the literature: report and comment on heterogeneity of the studies (tau, I2), on publication bias (funnel plot), and on influential studies.
+
+## Tips on the process to follow:
+
+- Download the data on all published articles analyzing pitch in schizophrenia (on gitlab)
+- Look through the dataset to find out which columns to use, and if there is any additional information written as comments (real world data is always messy!).
+    * Hint: Make sure you read the comments in the columns: `pitch_f0_variability`, `frequency`, `Title`,  `ACOUST_ANA_DESCR`, `DESCRIPTION`, and `COMMENTS`
+- Following the procedure in the slides calculate effect size and standard error of the effect size per each study. N.B. we focus on pitch mean and pitch standard deviation.
+ . first try using lmer (to connect to what you know of mixed effects models)
+ . then use rma() (to get some juicy additional statistics)
+
+- Build a forest plot of the results (forest(model))
+ 
+- Go back to Assignment 3, add your own study to the data table, and re-run meta-analysis. Do the results change?
+
+- Now look at the output of rma() and check tau and I2
+
+```{r}
+#STOLEN STRAIGHT FROM MIKKEL, lOl
+
+library(pacman)
+
+
+
+p_load(metafor, tidyverse, caret, lmerTest)
+
+data <- read.csv("Assignment5_MetaAnalysis_SR_SCHIZO.csv")
+
+PitchRange=escalc('SMD', n1i=SAMPLE_SIZE_SZ, n2i=SAMPLE_SIZE_HC, m1i=PITCH_F0_SZ_M,
+m2i=PITCH_F0_HC_M, sd1i=PITCH_F0_SZ_SD, sd2i=PITCH_F0_HC_SD,
+data = data)
+
+PitchRangeSD=escalc('SMD', n1i=SAMPLE_SIZE_SZ, n2i=SAMPLE_SIZE_HC, m1i=PITCH_F0SD_SZ_M,
+m2i=PITCH_F0SD_HC_M, sd1i=PITCH_F0SD_SZ_SD, sd2i=PITCH_F0SD_HC_SD,
+data = data)
+PitchRange <- filter(PitchRange, complete.cases(PitchRange$yi))
+PitchRangeSD <- filter(PitchRangeSD, complete.cases(PitchRangeSD$yi))
+
+colnames(PitchRangeSD)[22] <- "yiSD"
+colnames(PitchRangeSD)[23] <- "viSD"
+
+meta <- dplyr::full_join(PitchRange, PitchRangeSD)
+
+#deleting useless columns 
+```
+
+partialing up into two datasets 
+
+```{r}
+
+mean_analysis <- meta %>%
+  filter(yi != 'NA') %>%
+  select(StudyID, Article, SAMPLE_SIZE_SZ, SAMPLE_SIZE_HC, PITCH_F0_SZ_M, PITCH_F0_HC_M, PITCH_F0_SZ_SD, PITCH_F0_HC_SD, yi, vi)
+
+sd_analysis <- meta %>%
+  filter(yiSD != 'NA') %>%
+  select(StudyID, Article, SAMPLE_SIZE_SZ, SAMPLE_SIZE_HC, PITCH_F0SD_SZ_M, PITCH_F0SD_HC_M, PITCH_F0SD_SZ_SD, PITCH_F0SD_HC_SD, yiSD, viSD)
+
+```
+
+Model for Mean
+
+```{r}
+library(metafor)
+m1_mean <- lmer(yi ~ 1 + (1|StudyID), weights = 1/vi, data=mean_analysis,
+control=lmerControl(check.nobs.vs.nlev="ignore",
+check.nobs.vs.nRE="ignore"))
+
+m2_mean <- rma(yi, vi, data = mean_analysis, slab=StudyID)
+forest(m2_mean)
+
+```
+
+Model for SD 
+
+```{r}
+
+m1_SD <- lmer(yiSD ~ 1 + (1|StudyID), weights = 1/viSD, data=sd_analysis,
+control=lmerControl(check.nobs.vs.nlev="ignore",
+check.nobs.vs.nRE="ignore"))
+
+m2_SD <- rma(yiSD, viSD, data = sd_analysis, slab=Article)
+forest(m2_SD)
+
+```
+
+Quality check - Heterogeneity
+--> Magnus analysis? 
+
+```{r}
+
+confint(m2_mean)
+confint(m2_SD)
+
+```
+
+Influential studies
+
+```{r}
+
+#mean
+inf <- influence(m2_mean)
+print(inf)
+plot(inf) #study 2 is fucked. 
+
+#sd
+inf1 <- influence(m2_SD)
+print(inf1)
+plot(inf1) #study 6 is fucked. 
+
+```
+
+
+Funnelplots - publication bias (needs quantification)
+
+```{r}
+
+funnel(m2_mean, main = "Random-Effects Model", xlab = "Standardized Mean
+Difference")
+
+funnel(m2_SD, main = "Random-Effects Model", xlab = "Standardized Mean
+Difference")
+
+```
+
