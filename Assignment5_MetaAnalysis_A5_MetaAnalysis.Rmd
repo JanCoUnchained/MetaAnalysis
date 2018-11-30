@@ -60,5 +60,60 @@ colnames(PitchRangeSD)[23] <- "viSD"
 
 meta <- dplyr::full_join(PitchRange, PitchRangeSD)
 
+#deleting useless columns 
+```
+
+partialing up into two datasets 
+
+```{r}
+
+mean_analysis <- meta %>%
+  filter(yi != 'NA') %>%
+  select(StudyID, Article, SAMPLE_SIZE_SZ, SAMPLE_SIZE_HC, PITCH_F0_SZ_M, PITCH_F0_HC_M, PITCH_F0_SZ_SD, PITCH_F0_HC_SD, yi, vi)
+
+sd_analysis <- meta %>%
+  filter(yiSD != 'NA') %>%
+  select(StudyID, Article, SAMPLE_SIZE_SZ, SAMPLE_SIZE_HC, PITCH_F0SD_SZ_M, PITCH_F0SD_HC_M, PITCH_F0SD_SZ_SD, PITCH_F0SD_HC_SD, yiSD, viSD)
+
+```
+
+Model for Mean
+
+```{r}
+library(metafor)
+m1_mean <- lmer(yi ~ 1 + (1|StudyID), weights = 1/vi, data=mean_analysis,
+control=lmerControl(check.nobs.vs.nlev="ignore",
+check.nobs.vs.nRE="ignore"))
+
+m2_mean <- rma(yi, vi, data = mean_analysis, slab=StudyID)
+forest(m2_mean)
+
+```
+
+Model for SD 
+
+```{r}
+
+m1_SD <- lmer(yiSD ~ 1 + (1|StudyID), weights = 1/viSD, data=sd_analysis,
+control=lmerControl(check.nobs.vs.nlev="ignore",
+check.nobs.vs.nRE="ignore"))
+
+m2_SD <- rma(yiSD, viSD, data = sd_analysis, slab=Article)
+forest(m2_SD)
+
+```
+
+
+
+Funnelplots
+
+```{r}
+
+funnel(m2_mean, main = "Random-Effects Model", xlab = "Standardized Mean
+Difference")
+
+funnel(m2_SD, main = "Random-Effects Model", xlab = "Standardized Mean
+Difference")
+
 ```
 
