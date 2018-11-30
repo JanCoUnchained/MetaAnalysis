@@ -104,10 +104,28 @@ forest(m2_SD)
 ```
 
 Quality check - Heterogeneity
+--> Magnus analysis? 
 
 ```{r}
 
-confint()
+confint(m2_mean)
+confint(m2_SD)
+
+```
+
+Influential studies
+
+```{r}
+
+#mean
+inf <- influence(m2_mean)
+print(inf)
+plot(inf) #study 2 is fucked. 
+
+#sd
+inf1 <- influence(m2_SD)
+print(inf1)
+plot(inf1) #study 6 is fucked. 
 
 ```
 
