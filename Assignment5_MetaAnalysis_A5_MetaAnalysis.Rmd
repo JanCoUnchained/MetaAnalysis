@@ -103,9 +103,16 @@ forest(m2_SD)
 
 ```
 
+Quality check - Heterogeneity
+
+```{r}
+
+confint()
+
+```
 
 
-Funnelplots
+Funnelplots - publication bias (needs quantification)
 
 ```{r}
 
