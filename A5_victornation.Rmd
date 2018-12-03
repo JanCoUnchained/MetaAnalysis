@@ -126,6 +126,99 @@ Figure out why it is very different (is it studying something else).
 
 
 ```{r}
+#mean
+inf <- influence(m2_mean)
+print(inf)
+plot(inf) #study 2 is fucked. 
+
+#sd
+inf1 <- influence(m2_SD)
+print(inf1)
+plot(inf1) #study 6 is fucked. 
+
+```
+
+
+Funnelplots - publication bias (needs quantification)
+
+```{r}
+
+funnel(m2_mean, main = "Random-Effects Model", xlab = "Standardized Mean
+Difference")
+
+funnel(m2_SD, main = "Random-Effects Model", xlab = "Standardized Mean
+Difference")
+
+```
+
+#### WITHOUT US, WITHOUT COHEN #### 
+
+excluding Cohen 
+
+```{r}
+no_JanCohen <- meta %>%
+  filter(!StudyID %in% c(15))
+```
+
+NB: I have not changed variable names for this analysis. 
+
+```{r}
+
+mean_analysis <- no_JanCohen %>%
+  filter(yi != 'NA') %>%
+  select(StudyID, Article, SAMPLE_SIZE_SZ, SAMPLE_SIZE_HC, PITCH_F0_SZ_M, PITCH_F0_HC_M, PITCH_F0_SZ_SD, PITCH_F0_HC_SD, yi, vi)
+
+sd_analysis <- no_JanCohen %>%
+  filter(yiSD != 'NA') %>%
+  select(StudyID, Article, SAMPLE_SIZE_SZ, SAMPLE_SIZE_HC, PITCH_F0SD_SZ_M, PITCH_F0SD_HC_M, PITCH_F0SD_SZ_SD, PITCH_F0SD_HC_SD, yiSD, viSD)
+
+```
+
+Model for Mean:
+
+```{r}
+library(metafor)
+m1_mean <- lmer(yi ~ 1 + (1|StudyID), weights = 1/vi, data=mean_analysis,
+control=lmerControl(check.nobs.vs.nlev="ignore",
+check.nobs.vs.nRE="ignore"))
+
+m2_mean <- rma(yi, vi, data = mean_analysis, slab=Article)
+forest(m2_mean)
+
+```
+
+Model for SD:
+--> significant. 
+
+```{r}
+
+m1_SD <- lmer(yiSD ~ 1 + (1|StudyID), weights = 1/viSD, data=sd_analysis,
+control=lmerControl(check.nobs.vs.nlev="ignore",
+check.nobs.vs.nRE="ignore"))
+
+m2_SD <- rma(yiSD, viSD, data = sd_analysis, slab=Article)
+forest(m2_SD)
+
+```
+
+Quality check - Heterogeneity:
+
+```{r}
+
+confint(m2_mean, level = .95) #high
+confint(m2_SD, level = .95) #extreme
+
+```
+
+Influential studies. 
+
+COHEN: 
+SD in every utterance not across. 
+Figure out why it is very different (is it studying something else).
+--> if not: multiverse analysis --> do the analysis without Cohen (does this change anything). 
+
+
+```{r}
 
 #mean
 inf <- influence(m2_mean)
@@ -152,9 +245,94 @@ Difference")
 
 ```
 
-#### TASK 3 ####
 
-Loading in our data? 
+
+#### TASK 3 ####
+Loading data from assignment 3 & obtaining the data we need to include the three studies from that assignment. 
+
+```{r}
+#loading the data from assignment 3 
+schizo_data <- read.csv("schizo_data.csv")
+schizo_data <- schizo_data[,-1]
+schizo_data$study <- as.factor(schizo_data$study)
+schizo_data$diagnosis <- as.factor(schizo_data$diagnosis)
+
+#making models - using all three studies.
+model1 <- lmer(mean ~ diagnosis + (1|study), data = schizo_data)
+summary(model1) #bigger mean - significant
+
+model2 <- lmer(sd ~ diagnosis + (1|study), data = schizo_data)
+summary(model2) #not significant
+
+#maing a new dataframe 
+diagnosis <- as.factor(c(0, 0, 0, 1, 1, 1))
+study <- as.factor(c(1, 2, 4, 1, 2, 4))
+newdata <- data.frame(diagnosis, study)
+
+#predictions 
+set.seed(1000)
+newdata$SD <- predict(model2, newdata, allow.new.levels=T)
+newdata$MEAN <- predict(model1, newdata, allow.new.levels=T)
+
+#per participant 
+sd_sd <- schizo_data %>%
+  group_by(study, diagnosis) %>%
+  summarise(sd_sd = sd(sd)) 
+
+mean_sd <- schizo_data %>%
+  group_by(study, diagnosis) %>%
+  summarise(sd_mean = sd(mean))
+
+#combining dataframes
+combined_baby <- inner_join(newdata, sd_sd, by = c("diagnosis", "study"))
+combined_baby <- inner_join(combined_baby, mean_sd, by = c("diagnosis", "study"))
+
+#Adding N from diff studies 
+library(tidyverse)
+great <- schizo_data %>%
+  group_by(study, diagnosis) %>%
+  summarize(n = n())
+
+#with number
+withnumber <- inner_join(combined_baby, great, by = c("study", "diagnosis"))
+
+#three different studies - partialing it up. 
+SCHIZO <- withnumber %>%
+  filter(diagnosis == 1) %>%
+  rename("SAMPLE_SIZE_SZ" = "n", "PITCH_F0SD_SZ_M" = "SD", "PITCH_F0_SZ_M" = "MEAN", "PITCH_F0_SZ_SD" = "sd_mean", "PITCH_F0SD_SZ_SD" = "sd_sd") %>%
+  select(-diagnosis)
+
+TD <- withnumber %>% 
+  filter(diagnosis == 0) %>%
+  rename("SAMPLE_SIZE_HC" = "n", "PITCH_F0SD_HC_M" = "SD", "PITCH_F0_HC_M" = "MEAN", "PITCH_F0_HC_SD" = "sd_mean", "PITCH_F0SD_HC_SD" = "sd_sd") %>%
+  select(-diagnosis)
+
+combined <- inner_join(TD, SCHIZO, by = "study")
+
+#making the three dataframes that we need. 
+library(metafor)
+PitchRange=escalc('SMD', n1i=SAMPLE_SIZE_SZ, n2i=SAMPLE_SIZE_HC, m1i=PITCH_F0_SZ_M,
+m2i=PITCH_F0_HC_M, sd1i=PITCH_F0_SZ_SD, sd2i=PITCH_F0_HC_SD,
+data = combined)
+
+PitchRangeSD=escalc('SMD', n1i=SAMPLE_SIZE_SZ, n2i=SAMPLE_SIZE_HC, m1i=PITCH_F0SD_SZ_M,
+m2i=PITCH_F0SD_HC_M, sd1i=PITCH_F0SD_SZ_SD, sd2i=PITCH_F0SD_HC_SD,
+data = combined)
+
+PitchRange <- filter(PitchRange, complete.cases(PitchRange$yi))
+PitchRangeSD <- filter(PitchRangeSD, complete.cases(PitchRangeSD$yi))
+
+colnames(PitchRangeSD)[12] <- "yiSD"
+colnames(PitchRangeSD)[13] <- "viSD"
+
+combined <- dplyr::full_join(PitchRange, PitchRangeSD)
+
+#Saving the data
+write.csv(combined, "ass3_studies.csv", row.names = FALSE)
+
+```
+
+Loading in our data. 
 
 ```{r}
 
@@ -256,100 +434,6 @@ Difference") #something lacking to the left..?
 
 funnel(m2_SDJanCo, main = "Random-Effects Model", xlab = "Standardized Mean
 Difference") #crazy outlier - difficult to interpret. 
-```
-
-#### WITHOUT US, WITHOUT COHEN #### 
-
-excluding Cohen 
-
-```{r}
-no_JanCohen <- meta %>%
-  filter(!StudyID %in% c(15))
-```
-
-NB: I have not changed variable names for this analysis. 
-
-```{r}
-
-mean_analysis <- no_JanCohen %>%
-  filter(yi != 'NA') %>%
-  select(StudyID, Article, SAMPLE_SIZE_SZ, SAMPLE_SIZE_HC, PITCH_F0_SZ_M, PITCH_F0_HC_M, PITCH_F0_SZ_SD, PITCH_F0_HC_SD, yi, vi)
-
-sd_analysis <- no_JanCohen %>%
-  filter(yiSD != 'NA') %>%
-  select(StudyID, Article, SAMPLE_SIZE_SZ, SAMPLE_SIZE_HC, PITCH_F0SD_SZ_M, PITCH_F0SD_HC_M, PITCH_F0SD_SZ_SD, PITCH_F0SD_HC_SD, yiSD, viSD)
-
-```
-
-Model for Mean:
-
-```{r}
-library(metafor)
-m1_mean <- lmer(yi ~ 1 + (1|StudyID), weights = 1/vi, data=mean_analysis,
-control=lmerControl(check.nobs.vs.nlev="ignore",
-check.nobs.vs.nRE="ignore"))
-
-m2_mean <- rma(yi, vi, data = mean_analysis, slab=Article)
-forest(m2_mean)
-
-```
-
-Model for SD:
---> significant. 
-
-```{r}
-
-m1_SD <- lmer(yiSD ~ 1 + (1|StudyID), weights = 1/viSD, data=sd_analysis,
-control=lmerControl(check.nobs.vs.nlev="ignore",
-check.nobs.vs.nRE="ignore"))
-
-m2_SD <- rma(yiSD, viSD, data = sd_analysis, slab=Article)
-forest(m2_SD)
-
-```
-
-Quality check - Heterogeneity:
-
-```{r}
-
-confint(m2_mean, level = .95) #high
-confint(m2_SD, level = .95) #extreme
-
-```
-
-Influential studies. 
-
-COHEN: 
-SD in every utterance not across. 
-Figure out why it is very different (is it studying something else).
---> if not: multiverse analysis --> do the analysis without Cohen (does this change anything). 
-
-
-```{r}
-
-#mean
-inf <- influence(m2_mean)
-print(inf)
-plot(inf) #study 2 is fucked. 
-
-#sd
-inf1 <- influence(m2_SD)
-print(inf1)
-plot(inf1) #study 6 is fucked. 
-
-```
-
-
-Funnelplots - publication bias (needs quantification)
-
-```{r}
-
-funnel(m2_mean, main = "Random-Effects Model", xlab = "Standardized Mean
-Difference")
-
-funnel(m2_SD, main = "Random-Effects Model", xlab = "Standardized Mean
-Difference")
-
 ```
 
 
