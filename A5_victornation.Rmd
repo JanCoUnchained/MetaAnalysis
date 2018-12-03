@@ -386,6 +386,7 @@ check.nobs.vs.nRE="ignore"))
 
 m2_MJanCo <- rma(yi, vi, data = mean_JanCo, slab=Article)
 forest(m2_MJanCo)
+(m2_MJanCo)
 
 ```
 
