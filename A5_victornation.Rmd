@@ -152,3 +152,109 @@ Difference")
 
 ```
 
+#### TASK 3 ####
+
+Loading in our data? 
+
+```{r}
+
+#STUDY ID, SAMPLE_SIZE_SZ, SAMPLE_SIZE_HC, 
+our_data <- read.csv("ass3_studies.csv")
+our_data <- our_data %>%
+  mutate(StudyID = c(49,50,51)) %>%
+  mutate(Article = c("JanCo et al. (3000)", "JanCo more al. (3000)", "JanCo most al. (3000)"))
+
+#crazy try
+rbind.match.columns <- function(input1, input2) {
+    n.input1 <- ncol(input1)
+    n.input2 <- ncol(input2)
+ 
+    if (n.input2 < n.input1) {
+        TF.names <- which(names(input2) %in% names(input1))
+        column.names <- names(input2[, TF.names])
+    } else {
+        TF.names <- which(names(input1) %in% names(input2))
+        column.names <- names(input1[, TF.names])
+    }
+ 
+    return(rbind(input1[, column.names], input2[, column.names]))
+}
+ 
+#joining them. 
+withoutwithout <- rbind.match.columns(our_data, meta)
+```
+
+two dataframes with own. 
+
+```{r}
+mean_JanCo <- withoutwithout %>%
+  filter(yi != 'NA') %>%
+  select(StudyID, Article, SAMPLE_SIZE_SZ, SAMPLE_SIZE_HC, PITCH_F0_SZ_M, PITCH_F0_HC_M, PITCH_F0_SZ_SD, PITCH_F0_HC_SD, yi, vi)
+
+sd_JanCo <- withoutwithout %>%
+  filter(yiSD != 'NA') %>%
+  select(StudyID, Article, SAMPLE_SIZE_SZ, SAMPLE_SIZE_HC, PITCH_F0SD_SZ_M, PITCH_F0SD_HC_M, PITCH_F0SD_SZ_SD, PITCH_F0SD_HC_SD, yiSD, viSD)
+
+```
+
+running analysis on mean 
+--> now significant predictor. 
+
+```{r}
+
+m1_MJanCo <- lmer(yi ~ 1 + (1|StudyID), weights = 1/vi, data=mean_JanCo,
+control=lmerControl(check.nobs.vs.nlev="ignore",
+check.nobs.vs.nRE="ignore"))
+
+m2_MJanCo <- rma(yi, vi, data = mean_JanCo, slab=Article)
+forest(m2_MJanCo)
+
+```
+
+running analysis on sd
+--> still not significant (fucking outlier)
+
+```{r}
+m1_SDJanCo <- lmer(yiSD ~ 1 + (1|StudyID), weights = 1/viSD, data=sd_JanCo,
+control=lmerControl(check.nobs.vs.nlev="ignore",
+check.nobs.vs.nRE="ignore"))
+
+m2_SDJanCo <- rma(yiSD, viSD, data = sd_JanCo, slab=Article)
+forest(m2_SDJanCo)
+
+```
+
+How fuck is everything?
+
+```{r}
+
+confint(m2_MJanCo, level = .95) #interpret. 
+confint(m2_SDJanCo, level = .95) #interpret. 
+
+```
+
+Influential studies:
+--> of course there is still one fucking bitch study (Cohen)
+
+```{r}
+#mean
+inf <- influence(m2_MJanCo)
+print(inf)
+plot(inf) #study 2 is fucked. 
+
+#sd
+inf1 <- influence(m2_SDJanCo)
+print(inf1)
+plot(inf1) #study 6 is fucked. 
+```
+
+Funnel plots
+
+```{r}
+funnel(m2_MJanCo, main = "Random-Effects Model", xlab = "Standardized Mean
+Difference") #something lacking to the left..?
+
+funnel(m2_SDJanCo, main = "Random-Effects Model", xlab = "Standardized Mean
+Difference") #crazy outlier - difficult to interpret. 
+```
+
