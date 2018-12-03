@@ -258,3 +258,194 @@ funnel(m2_SDJanCo, main = "Random-Effects Model", xlab = "Standardized Mean
 Difference") #crazy outlier - difficult to interpret. 
 ```
 
+#### WITHOUT US, WITHOUT COHEN #### 
+
+excluding Cohen 
+
+```{r}
+no_JanCohen <- meta %>%
+  filter(!StudyID %in% c(15))
+```
+
+NB: I have not changed variable names for this analysis. 
+
+```{r}
+
+mean_analysis <- no_JanCohen %>%
+  filter(yi != 'NA') %>%
+  select(StudyID, Article, SAMPLE_SIZE_SZ, SAMPLE_SIZE_HC, PITCH_F0_SZ_M, PITCH_F0_HC_M, PITCH_F0_SZ_SD, PITCH_F0_HC_SD, yi, vi)
+
+sd_analysis <- no_JanCohen %>%
+  filter(yiSD != 'NA') %>%
+  select(StudyID, Article, SAMPLE_SIZE_SZ, SAMPLE_SIZE_HC, PITCH_F0SD_SZ_M, PITCH_F0SD_HC_M, PITCH_F0SD_SZ_SD, PITCH_F0SD_HC_SD, yiSD, viSD)
+
+```
+
+Model for Mean:
+
+```{r}
+library(metafor)
+m1_mean <- lmer(yi ~ 1 + (1|StudyID), weights = 1/vi, data=mean_analysis,
+control=lmerControl(check.nobs.vs.nlev="ignore",
+check.nobs.vs.nRE="ignore"))
+
+m2_mean <- rma(yi, vi, data = mean_analysis, slab=Article)
+forest(m2_mean)
+
+```
+
+Model for SD:
+--> significant. 
+
+```{r}
+
+m1_SD <- lmer(yiSD ~ 1 + (1|StudyID), weights = 1/viSD, data=sd_analysis,
+control=lmerControl(check.nobs.vs.nlev="ignore",
+check.nobs.vs.nRE="ignore"))
+
+m2_SD <- rma(yiSD, viSD, data = sd_analysis, slab=Article)
+forest(m2_SD)
+
+```
+
+Quality check - Heterogeneity:
+
+```{r}
+
+confint(m2_mean, level = .95) #high
+confint(m2_SD, level = .95) #extreme
+
+```
+
+Influential studies. 
+
+COHEN: 
+SD in every utterance not across. 
+Figure out why it is very different (is it studying something else).
+--> if not: multiverse analysis --> do the analysis without Cohen (does this change anything). 
+
+
+```{r}
+
+#mean
+inf <- influence(m2_mean)
+print(inf)
+plot(inf) #study 2 is fucked. 
+
+#sd
+inf1 <- influence(m2_SD)
+print(inf1)
+plot(inf1) #study 6 is fucked. 
+
+```
+
+
+Funnelplots - publication bias (needs quantification)
+
+```{r}
+
+funnel(m2_mean, main = "Random-Effects Model", xlab = "Standardized Mean
+Difference")
+
+funnel(m2_SD, main = "Random-Effects Model", xlab = "Standardized Mean
+Difference")
+
+```
+
+
+#### WITH US, WITHOUT COHEN #### 
+
+Excluding Cohen
+
+```{r}
+
+no_cohen <- withoutwithout %>%
+  filter(!StudyID %in% c(15))
+
+```
+
+two models without cohen
+
+```{r}
+mean_no_cohen <- no_cohen %>%
+  filter(yi != 'NA') %>%
+  select(StudyID, Article, SAMPLE_SIZE_SZ, SAMPLE_SIZE_HC, PITCH_F0_SZ_M, PITCH_F0_HC_M, PITCH_F0_SZ_SD, PITCH_F0_HC_SD, yi, vi)
+
+sd_no_cohen <- no_cohen %>%
+  filter(yiSD != 'NA') %>%
+  select(StudyID, Article, SAMPLE_SIZE_SZ, SAMPLE_SIZE_HC, PITCH_F0SD_SZ_M, PITCH_F0SD_HC_M, PITCH_F0SD_SZ_SD, PITCH_F0SD_HC_SD, yiSD, viSD)
+
+```
+
+Model for Mean
+--> surprise, surprise. Also significant without Cohen. 
+
+```{r}
+library(metafor)
+m1_mean <- lmer(yi ~ 1 + (1|StudyID), weights = 1/vi, data=mean_no_cohen,
+control=lmerControl(check.nobs.vs.nlev="ignore",
+check.nobs.vs.nRE="ignore"))
+
+m2_mean <- rma(yi, vi, data = mean_no_cohen, slab=Article)
+forest(m2_mean)
+
+```
+
+Model for SD 
+--> significant without Cohen (fuck that guy) :) :) 
+
+```{r}
+
+m1_SD <- lmer(yiSD ~ 1 + (1|StudyID), weights = 1/viSD, data=sd_no_cohen,
+control=lmerControl(check.nobs.vs.nlev="ignore",
+check.nobs.vs.nRE="ignore"))
+
+m2_SD <- rma(yiSD, viSD, data = sd_no_cohen, slab=Article)
+forest(m2_SD)
+
+```
+
+Quality check - Heterogeneity
+--> Very high heterogeneity. 
+--> A lot that is not due to chance. 
+
+```{r}
+
+confint(m2_mean, level = .95) #high
+confint(m2_SD, level = .95) #extreme
+
+```
+
+Influential studies. 
+
+COHEN: 
+SD in every utterance not across. 
+Figure out why it is very different (is it studying something else).
+--> if not: multiverse analysis --> do the analysis without Cohen (does this change anything). 
+
+
+```{r}
+
+#mean
+inf <- influence(m2_mean)
+print(inf)
+plot(inf) #study 2 is fucked. 
+
+#sd
+inf1 <- influence(m2_SD)
+print(inf1)
+plot(inf1) #study 6 is fucked. 
+
+```
+
+Funnelplots - publication bias (needs quantification)
+
+```{r}
+
+funnel(m2_mean, main = "Random-Effects Model", xlab = "Standardized Mean
+Difference") #still something lacking left with big SE.  
+
+funnel(m2_SD, main = "Random-Effects Model", xlab = "Standardized Mean
+Difference") #looks terrible. 
+
+```
