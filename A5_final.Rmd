@@ -63,7 +63,8 @@ colnames(PitchRangeSD)[23] <- "viSD"
 
 meta <- dplyr::full_join(PitchRange, PitchRangeSD)
 
-#deleting useless columns 
+#writing csv
+write.csv(meta, "meta.csv", row.names = FALSE)
 ```
 
 partialing up into two datasets, one containing all the studies with data on pitch mean and one containing all the studies with data on pitch sd. Only a subset of variables are chosen. 
@@ -256,8 +257,6 @@ Difference")
 #### TASK 3 ####
 Loading data from assignment 3 & obtaining the data we need to include the three studies from that assignment. 
 
-#### MALTE REVISIONS ####
-
 ```{r}
 #loading the data from assignment 3 
 schizo_data <- read.csv("schizo_data.csv")
@@ -340,7 +339,6 @@ write.csv(combined, "ass3_studies.csv", row.names = FALSE)
 
 ```
 
-Loading in our data. 
 
 ```{r}
 

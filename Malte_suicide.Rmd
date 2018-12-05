@@ -1,0 +1,354 @@
+---
+title: "malte_approach"
+author: "Victor Møller"
+date: "5 dec 2018"
+output: html_document
+---
+
+### MALTE APPROACH ###
+
+takes quite a while the way I have done it here. 
+Mainly because I don't get sample size of the two groups in the three studies & because I can't do the studies at the same time with the syntax lmer(predicted ~ 0 +). I need to get estimates & standard errors for all studies & all groups (6 estimates & standard errors in total.)
+
+Note that now our studies do not agree on the effect of mean. 
+JanCo most et al. has a negative value (schizo have lower mean pitch). 
+
+```{r}
+#still need schizo data 
+schizo_data <- read.csv("schizo_data.csv")
+schizo_data <- schizo_data[,-1]
+schizo_data$study <- as.factor(schizo_data$study)
+schizo_data$diagnosis <- as.factor(schizo_data$diagnosis)
+
+#three subsets 
+library(tidyverse)
+study1 <- schizo_data %>%
+  filter(study == 1)
+
+study2 <- schizo_data %>%
+  filter(study == 2)
+
+study4 <- schizo_data %>%
+  filter(study == 4)
+
+#This is the study that is fucked now. 
+hmm <- study4 %>% 
+  group_by(diagnosis) %>%
+  summarise(mean = mean(mean))
+
+#models for mean & sd
+mean_1 <- lm(mean ~ 0 + diagnosis, data = study1)
+sd_1 <- lm(sd ~ 0 + diagnosis, data = study1)
+mean_2 <- lm(mean ~ 0 + diagnosis, data = study2)
+sd_2 <- lm(sd ~ 0 + diagnosis, data = study2)
+mean_3 <- lm(mean ~ 0 + diagnosis, data = study4)
+sd_3 <- lm(sd ~ 0 + diagnosis, data = study4)
+
+#statistics 
+summary(mean_1)
+m1 <- summary(mean_1)
+sd1 <- summary(sd_1)
+m2 <- summary(mean_2)
+sd2 <- summary(sd_2)
+m3 <- summary(mean_3)
+sd3 <- summary(sd_3)
+
+#finding sd for the estimates 
+#standard error * sqrt(n)
+coefficients(sd_3)
+coef_m1 <- as.data.frame(m1$coefficients[ , 1:2])
+coef_sd1 <- as.data.frame(sd1$coefficients[ , 1:2])
+coef_m2 <- as.data.frame(m2$coefficients[ , 1:2])
+coef_sd2 <- as.data.frame(sd2$coefficients[ , 1:2])
+coef_m3 <- as.data.frame(m3$coefficients[ , 1:2])
+coef_sd3 <- as.data.frame(sd3$coefficients[ , 1:2])
+
+#putting them together. 
+m_coef <- rbind(coef_m1, coef_m2, coef_m3)
+sd_coef <- rbind(coef_sd1, coef_sd2, coef_sd3)
+
+#sample size 
+supersamle <- schizo_data %>%
+  group_by(study, diagnosis) %>%
+  summarize(n = n())
+
+#to bind by 
+diagnosis <- as.factor(c(0, 1, 0, 1, 0, 1))
+study <- as.factor(c(1, 1, 2, 2, 4, 4))
+
+#binding 
+sd_coef <- cbind(diagnosis, study, sd_coef)
+m_coef <- cbind(diagnosis, study, m_coef)
+
+library(tidyverse)
+m_coef <- m_coef %>%
+  rename(mean_est = Estimate, mean_std_error = "Std. Error")
+
+sd_coef <- sd_coef %>%
+  rename(sd_est = Estimate, sd_std_error = "Std. Error")
+
+#binding more 
+all_coef <- merge(sd_coef, m_coef, by = c("diagnosis", "study"))
+all_coef_super <- merge(all_coef, supersamle, by = c("diagnosis", "study"))
+
+#calculating SD
+with_sd <- all_coef_super %>%
+  mutate(sdsd = sd_std_error * sqrt(n)) %>%
+  mutate(sdmean = mean_std_error * sqrt(n))
+
+#three different studies - partialing it up. 
+schizophrenics <- with_sd %>%
+  filter(diagnosis == 1) %>%
+  rename("SAMPLE_SIZE_SZ" = "n", "PITCH_F0SD_SZ_M" = "sd_est", "PITCH_F0_SZ_M" = "mean_est", "PITCH_F0_SZ_SD" = "sdmean", "PITCH_F0SD_SZ_SD" = "sdsd") %>%
+  ungroup() %>%
+  select(-diagnosis, -sd_std_error, -mean_std_error)
+
+healthyctrls <- with_sd %>% 
+  filter(diagnosis == 0) %>%
+  rename("SAMPLE_SIZE_HC" = "n", "PITCH_F0SD_HC_M" = "sd_est", "PITCH_F0_HC_M" = "mean_est", "PITCH_F0_HC_SD" = "sdmean", "PITCH_F0SD_HC_SD" = "sdsd") %>%
+  ungroup() %>%
+  select(-diagnosis, -sd_std_error, -mean_std_error)
+
+everything_is_nice <- inner_join(schizophrenics, healthyctrls, by = "study")
+
+#making the three dataframes that we need. 
+library(metafor)
+PitchRange=escalc('SMD', n1i=SAMPLE_SIZE_SZ, n2i=SAMPLE_SIZE_HC, m1i=PITCH_F0_SZ_M,
+m2i=PITCH_F0_HC_M, sd1i=PITCH_F0_SZ_SD, sd2i=PITCH_F0_HC_SD,
+data = everything_is_nice)
+
+PitchRangeSD=escalc('SMD', n1i=SAMPLE_SIZE_SZ, n2i=SAMPLE_SIZE_HC, m1i=PITCH_F0SD_SZ_M,
+m2i=PITCH_F0SD_HC_M, sd1i=PITCH_F0SD_SZ_SD, sd2i=PITCH_F0SD_HC_SD,
+data = everything_is_nice)
+
+PitchRange <- filter(PitchRange, complete.cases(PitchRange$yi))
+PitchRangeSD <- filter(PitchRangeSD, complete.cases(PitchRangeSD$yi))
+
+colnames(PitchRangeSD)[12] <- "yiSD"
+colnames(PitchRangeSD)[13] <- "viSD"
+
+combined <- dplyr::full_join(PitchRange, PitchRangeSD)
+write.csv(combined, "ass3_studies_2ndapproach.csv", row.names = FALSE)
+
+```
+
+Checking for difference: 
+
+```{r}
+
+our_data_old_way <- read.csv("ass3_studies.csv")
+our_data_new_way <- read.csv("ass3_studies_2ndapproach.csv")
+
+differences <- rbind(our_data_old_way, our_data_new_way)
+
+```
+
+Loading in our data (the old for now)
+
+```{r}
+#need meta
+meta <- read.csv("meta.csv")
+
+#STUDY ID, SAMPLE_SIZE_SZ, SAMPLE_SIZE_HC, 
+our_data <- read.csv("ass3_studies_2ndapproach.csv")
+our_data <- our_data %>%
+  mutate(StudyID = c(49,50,51)) %>%
+  mutate(Article = c("JanCo et al. (3000)", "JanCo more al. (3000)", "JanCo most al. (3000)"))
+
+#crazy try
+rbind.match.columns <- function(input1, input2) {
+    n.input1 <- ncol(input1)
+    n.input2 <- ncol(input2)
+ 
+    if (n.input2 < n.input1) {
+        TF.names <- which(names(input2) %in% names(input1))
+        column.names <- names(input2[, TF.names])
+    } else {
+        TF.names <- which(names(input1) %in% names(input2))
+        column.names <- names(input1[, TF.names])
+    }
+ 
+    return(rbind(input1[, column.names], input2[, column.names]))
+}
+ 
+#joining them. 
+a3_full <- rbind.match.columns(our_data, meta)
+```
+
+two dataframes with own. 
+
+```{r}
+a3_mean <- a3_full %>%
+  filter(yi != 'NA') %>%
+  select(StudyID, Article, SAMPLE_SIZE_SZ, SAMPLE_SIZE_HC, PITCH_F0_SZ_M, PITCH_F0_HC_M, PITCH_F0_SZ_SD, PITCH_F0_HC_SD, yi, vi)
+
+a3_sd <- a3_full %>%
+  filter(yiSD != 'NA') %>%
+  select(StudyID, Article, SAMPLE_SIZE_SZ, SAMPLE_SIZE_HC, PITCH_F0SD_SZ_M, PITCH_F0SD_HC_M, PITCH_F0SD_SZ_SD, PITCH_F0SD_HC_SD, yiSD, viSD)
+
+```
+
+running analysis on mean 
+--> now significant predictor. 
+
+```{r}
+
+a3_m1_mean <- lmer(yi ~ 1 + (1|StudyID), weights = 1/vi, data=a3_mean,
+control=lmerControl(check.nobs.vs.nlev="ignore",
+check.nobs.vs.nRE="ignore"))
+
+a3_m2_mean <- rma(yi, vi, data = a3_mean, slab=Article)
+forest(a3_m2_mean)
+a3_m2_mean
+
+```
+
+running analysis on sd
+--> still not significant (fucking outlier)
+
+```{r}
+a3_m1_sd <- lmer(yiSD ~ 1 + (1|StudyID), weights = 1/viSD, data=a3_sd,
+control=lmerControl(check.nobs.vs.nlev="ignore",
+check.nobs.vs.nRE="ignore"))
+
+a3_m2_sd <- rma(yiSD, viSD, data = a3_sd, slab=Article)
+forest(a3_m2_sd)
+a3_m2_sd
+
+```
+
+running confint again. 
+
+```{r}
+library(metafor)
+confint(a3_m2_mean, level = .95) #interpret. 
+confint(a3_m2_sd, level = .95) #interpret. 
+
+```
+
+Influential studies:
+--> Cohen is still a crazy outlier. 
+
+```{r}
+#mean
+inf <- influence(a3_m2_mean)
+print(inf)
+plot(inf) #study 2 is fucked. 
+
+#sd
+inf1 <- influence(a3_m2_sd)
+print(inf1)
+plot(inf1) #study 6 is fucked. 
+```
+
+Funnel plots
+
+```{r}
+funnel(a3_m2_mean, main = "Random-Effects Model", xlab = "Standardized Mean
+Difference") #something lacking to the left..?
+
+funnel(a3_m2_sd, main = "Random-Effects Model", xlab = "Standardized Mean
+Difference") #crazy outlier - difficult to interpret. 
+```
+
+
+#### a4: WITH US, WITHOUT COHEN #### 
+
+Excluding Cohen from the third analysis. 
+
+```{r}
+
+a4_full <- a3_full %>%
+  filter(!StudyID %in% c(15))
+
+```
+
+With our study, without Cohen. 
+Dataframe for mean (a4_mean) & for sd (a4_sd)
+
+```{r}
+a4_mean <- a4_full %>%
+  filter(yi != 'NA') %>%
+  select(StudyID, Article, SAMPLE_SIZE_SZ, SAMPLE_SIZE_HC, PITCH_F0_SZ_M, PITCH_F0_HC_M, PITCH_F0_SZ_SD, PITCH_F0_HC_SD, yi, vi)
+
+a4_sd <- a4_full %>%
+  filter(yiSD != 'NA') %>%
+  select(StudyID, Article, SAMPLE_SIZE_SZ, SAMPLE_SIZE_HC, PITCH_F0SD_SZ_M, PITCH_F0SD_HC_M, PITCH_F0SD_SZ_SD, PITCH_F0SD_HC_SD, yiSD, viSD)
+
+```
+
+Model for Mean:
+--> surprise, surprise. Also significant without Cohen. 
+
+```{r}
+library(metafor)
+a4_m1_mean <- lmer(yi ~ 1 + (1|StudyID), weights = 1/vi, data=a4_mean,
+control=lmerControl(check.nobs.vs.nlev="ignore",
+check.nobs.vs.nRE="ignore"))
+
+a4_m2_mean <- rma(yi, vi, data = a4_mean, slab=Article)
+forest(a4_m2_mean)
+
+```
+
+Model for SD 
+--> significant without Cohen (as the 2nd analysis)
+
+```{r}
+
+a4_m1_SD <- lmer(yiSD ~ 1 + (1|StudyID), weights = 1/viSD, data=a4_sd,
+control=lmerControl(check.nobs.vs.nlev="ignore",
+check.nobs.vs.nRE="ignore"))
+
+a4_m2_SD <- rma(yiSD, viSD, data = a4_sd, slab=Article)
+forest(a4_m2_SD)
+a4_m2_SD
+
+```
+
+Quality check - Heterogeneity
+--> Very high heterogeneity. 
+--> A lot that is not due to chance. 
+
+```{r}
+
+confint(a4_m2_mean, level = .95) #high
+confint(a4_m2_SD, level = .95) #extreme
+
+```
+
+Influential studies. 
+
+COHEN: 
+SD in every utterance not across. 
+Figure out why it is very different (is it studying something else).
+--> if not: multiverse analysis --> do the analysis without Cohen (does this change anything). 
+
+
+```{r}
+
+#mean
+inf <- influence(a4_m2_mean)
+print(inf)
+plot(inf) #study 2 is fucked. 
+
+#sd
+inf1 <- influence(a4_m2_SD)
+print(inf1)
+plot(inf1) #study 6 is fucked. 
+
+```
+
+Funnelplots - publication bias (needs quantification?). 
+--> mean: perhaps lacking studies left of center w. high SE.
+--> sd: looks crazy w. high SE studies to the far left (outliers)
+
+```{r}
+
+funnel(a4_m2_mean, main = "Random-Effects Model", xlab = "Standardized Mean
+Difference") #still something lacking left with big SE.  
+
+funnel(a4_m2_SD, main = "Random-Effects Model", xlab = "Standardized Mean
+Difference") #looks terrible. 
+
+```
