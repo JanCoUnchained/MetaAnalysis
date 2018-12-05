@@ -34,8 +34,13 @@ knitr::opts_chunk$set(echo = TRUE)
 
 - Now look at the output of rma() and check tau and I2
 
+
+### STARTING ###
+
+Loading data & selecting studies w. quantitative data for the relevant attributes: 
+
 ```{r}
-#STOLEN STRAIGHT FROM MIKKEL, lOl
+#Loading data
 
 library(pacman)
 
@@ -61,48 +66,49 @@ meta <- dplyr::full_join(PitchRange, PitchRangeSD)
 #deleting useless columns 
 ```
 
-partialing up into two datasets 
+partialing up into two datasets, one containing all the studies with data on pitch mean and one containing all the studies with data on pitch sd. Only a subset of variables are chosen. 
 
 ```{r}
 
-mean_analysis <- meta %>%
+a1_mean <- meta %>%
   filter(yi != 'NA') %>%
   select(StudyID, Article, SAMPLE_SIZE_SZ, SAMPLE_SIZE_HC, PITCH_F0_SZ_M, PITCH_F0_HC_M, PITCH_F0_SZ_SD, PITCH_F0_HC_SD, yi, vi)
 
-sd_analysis <- meta %>%
+a1_sd <- meta %>%
   filter(yiSD != 'NA') %>%
   select(StudyID, Article, SAMPLE_SIZE_SZ, SAMPLE_SIZE_HC, PITCH_F0SD_SZ_M, PITCH_F0SD_HC_M, PITCH_F0SD_SZ_SD, PITCH_F0SD_HC_SD, yiSD, viSD)
 
 ```
 
 Model for Mean
---> Effect size around 0.5 - but the SE is very big. 
---> No conclusive evidence for an effect of mean pitch. 
+--> Effect size = 0.24, SE = 0.18
+--> P > 0.05: No conclusive evidence that mean pitch is a significant predictor. 
 
 ```{r}
 library(metafor)
-m1_mean <- lmer(yi ~ 1 + (1|StudyID), weights = 1/vi, data=mean_analysis,
+a1_m1_mean <- lmer(yi ~ 1 + (1|StudyID), weights = 1/vi, data=a1_mean,
 control=lmerControl(check.nobs.vs.nlev="ignore",
 check.nobs.vs.nRE="ignore"))
 
-m2_mean <- rma(yi, vi, data = mean_analysis, slab=Article)
-forest(m2_mean)
-m2_mean
+a1_m2_mean <- rma(yi, vi, data = a1_mean, slab=Article)
+forest(a1_m2_mean)
+a1_m2_mean
 
 ```
 
 Model for SD 
---> also crosses zero, so no conclusive evidence. 
+--> Effect size = -0.23, SE = 0.31
+--> p > 0.05, no conclusive evidence that pitch sd is a significant predictor. 
 
 ```{r}
 
-m1_SD <- lmer(yiSD ~ 1 + (1|StudyID), weights = 1/viSD, data=sd_analysis,
+a1_m1_SD <- lmer(yiSD ~ 1 + (1|StudyID), weights = 1/viSD, data=a1_sd,
 control=lmerControl(check.nobs.vs.nlev="ignore",
 check.nobs.vs.nRE="ignore"))
 
-m2_SD <- rma(yiSD, viSD, data = sd_analysis, slab=Article)
-forest(m2_SD)
-m2_SD
+a1_m2_SD <- rma(yiSD, viSD, data = a1_sd, slab=Article)
+forest(a1_m2_SD)
+a1_m2_SD
 
 ```
 
@@ -112,8 +118,8 @@ Quality check - Heterogeneity
 
 ```{r}
 
-confint(m2_mean, level = .95) #high
-confint(m2_SD, level = .95) #extreme
+confint(a1_m2_mean, level = .95) #high
+confint(a1_m2_SD, level = .95) #extreme
 
 ```
 
@@ -127,12 +133,12 @@ Figure out why it is very different (is it studying something else).
 
 ```{r}
 #mean
-inf <- influence(m2_mean)
+inf <- influence(a1_m2_mean)
 print(inf)
 plot(inf) #study 2 is fucked. 
 
 #sd
-inf1 <- influence(m2_SD)
+inf1 <- influence(a1_m2_SD)
 print(inf1)
 plot(inf1) #study 6 is fucked. 
 
@@ -143,10 +149,10 @@ Funnelplots - publication bias (needs quantification)
 
 ```{r}
 
-funnel(m2_mean, main = "Random-Effects Model", xlab = "Standardized Mean
+funnel(a1_m2_mean, main = "Random-Effects Model", xlab = "Standardized Mean
 Difference")
 
-funnel(m2_SD, main = "Random-Effects Model", xlab = "Standardized Mean
+funnel(a1_m2_SD, main = "Random-Effects Model", xlab = "Standardized Mean
 Difference")
 
 ```
@@ -156,7 +162,7 @@ Difference")
 excluding Cohen 
 
 ```{r}
-no_JanCohen <- meta %>%
+a2_full <- meta %>%
   filter(!StudyID %in% c(15))
 ```
 
@@ -164,11 +170,11 @@ NB: I have not changed variable names for this analysis.
 
 ```{r}
 
-mean_analysis <- no_JanCohen %>%
+a2_mean <- a2_full %>%
   filter(yi != 'NA') %>%
   select(StudyID, Article, SAMPLE_SIZE_SZ, SAMPLE_SIZE_HC, PITCH_F0_SZ_M, PITCH_F0_HC_M, PITCH_F0_SZ_SD, PITCH_F0_HC_SD, yi, vi)
 
-sd_analysis <- no_JanCohen %>%
+a2_sd <- a2_full %>%
   filter(yiSD != 'NA') %>%
   select(StudyID, Article, SAMPLE_SIZE_SZ, SAMPLE_SIZE_HC, PITCH_F0SD_SZ_M, PITCH_F0SD_HC_M, PITCH_F0SD_SZ_SD, PITCH_F0SD_HC_SD, yiSD, viSD)
 
@@ -178,12 +184,12 @@ Model for Mean:
 
 ```{r}
 library(metafor)
-m1_mean <- lmer(yi ~ 1 + (1|StudyID), weights = 1/vi, data=mean_analysis,
+a2_m1_mean <- lmer(yi ~ 1 + (1|StudyID), weights = 1/vi, data=a2_mean,
 control=lmerControl(check.nobs.vs.nlev="ignore",
 check.nobs.vs.nRE="ignore"))
 
-m2_mean <- rma(yi, vi, data = mean_analysis, slab=Article)
-forest(m2_mean)
+a2_m2_mean <- rma(yi, vi, data = a2_mean, slab=Article)
+forest(a2_m2_mean)
 
 ```
 
@@ -192,12 +198,12 @@ Model for SD:
 
 ```{r}
 
-m1_SD <- lmer(yiSD ~ 1 + (1|StudyID), weights = 1/viSD, data=sd_analysis,
+a2_m1_SD <- lmer(yiSD ~ 1 + (1|StudyID), weights = 1/viSD, data=a2_sd,
 control=lmerControl(check.nobs.vs.nlev="ignore",
 check.nobs.vs.nRE="ignore"))
 
-m2_SD <- rma(yiSD, viSD, data = sd_analysis, slab=Article)
-forest(m2_SD)
+a2_m2_SD <- rma(yiSD, viSD, data = a2_sd, slab=Article)
+forest(a2_m2_SD)
 
 ```
 
@@ -205,8 +211,8 @@ Quality check - Heterogeneity:
 
 ```{r}
 
-confint(m2_mean, level = .95) #high
-confint(m2_SD, level = .95) #extreme
+confint(a2_m2_mean, level = .95) #high
+confint(a2_m2_SD, level = .95) #extreme
 
 ```
 
@@ -221,12 +227,12 @@ Figure out why it is very different (is it studying something else).
 ```{r}
 
 #mean
-inf <- influence(m2_mean)
+inf <- influence(a2_m2_mean)
 print(inf)
 plot(inf) #study 2 is fucked. 
 
 #sd
-inf1 <- influence(m2_SD)
+inf1 <- influence(a2_m2_SD)
 print(inf1)
 plot(inf1) #study 6 is fucked. 
 
@@ -237,10 +243,10 @@ Funnelplots - publication bias (needs quantification)
 
 ```{r}
 
-funnel(m2_mean, main = "Random-Effects Model", xlab = "Standardized Mean
+funnel(a2_m2_mean, main = "Random-Effects Model", xlab = "Standardized Mean
 Difference")
 
-funnel(m2_SD, main = "Random-Effects Model", xlab = "Standardized Mean
+funnel(a2_m2_SD, main = "Random-Effects Model", xlab = "Standardized Mean
 Difference")
 
 ```
@@ -359,17 +365,17 @@ rbind.match.columns <- function(input1, input2) {
 }
  
 #joining them. 
-withoutwithout <- rbind.match.columns(our_data, meta)
+a3_full <- rbind.match.columns(our_data, meta)
 ```
 
 two dataframes with own. 
 
 ```{r}
-mean_JanCo <- withoutwithout %>%
+a3_mean <- a3_full %>%
   filter(yi != 'NA') %>%
   select(StudyID, Article, SAMPLE_SIZE_SZ, SAMPLE_SIZE_HC, PITCH_F0_SZ_M, PITCH_F0_HC_M, PITCH_F0_SZ_SD, PITCH_F0_HC_SD, yi, vi)
 
-sd_JanCo <- withoutwithout %>%
+a3_sd <- a3_full %>%
   filter(yiSD != 'NA') %>%
   select(StudyID, Article, SAMPLE_SIZE_SZ, SAMPLE_SIZE_HC, PITCH_F0SD_SZ_M, PITCH_F0SD_HC_M, PITCH_F0SD_SZ_SD, PITCH_F0SD_HC_SD, yiSD, viSD)
 
@@ -380,13 +386,13 @@ running analysis on mean
 
 ```{r}
 
-m1_MJanCo <- lmer(yi ~ 1 + (1|StudyID), weights = 1/vi, data=mean_JanCo,
+a3_m1_mean <- lmer(yi ~ 1 + (1|StudyID), weights = 1/vi, data=a3_mean,
 control=lmerControl(check.nobs.vs.nlev="ignore",
 check.nobs.vs.nRE="ignore"))
 
-m2_MJanCo <- rma(yi, vi, data = mean_JanCo, slab=Article)
-forest(m2_MJanCo)
-m2_MJanCo
+a3_m2_mean <- rma(yi, vi, data = a3_mean, slab=Article)
+forest(a3_m2_mean)
+a3_m2_mean
 
 ```
 
@@ -394,36 +400,36 @@ running analysis on sd
 --> still not significant (fucking outlier)
 
 ```{r}
-m1_SDJanCo <- lmer(yiSD ~ 1 + (1|StudyID), weights = 1/viSD, data=sd_JanCo,
+a3_m1_sd <- lmer(yiSD ~ 1 + (1|StudyID), weights = 1/viSD, data=a3_sd,
 control=lmerControl(check.nobs.vs.nlev="ignore",
 check.nobs.vs.nRE="ignore"))
 
-m2_SDJanCo <- rma(yiSD, viSD, data = sd_JanCo, slab=Article)
-forest(m2_SDJanCo)
-m2_SDJanCo
+a3_m2_sd <- rma(yiSD, viSD, data = a3_sd, slab=Article)
+forest(a3_m2_sd)
+a3_m2_sd
 
 ```
 
-How fuck is everything?
+running confint again. 
 
 ```{r}
 library(metafor)
-confint(m2_MJanCo, level = .95) #interpret. 
-confint(m2_SDJanCo, level = .95) #interpret. 
+confint(a3_m2_mean, level = .95) #interpret. 
+confint(a3_m2_sd, level = .95) #interpret. 
 
 ```
 
 Influential studies:
---> of course there is still one fucking bitch study (Cohen)
+--> Cohen is still a crazy outlier. 
 
 ```{r}
 #mean
-inf <- influence(m2_MJanCo)
+inf <- influence(a3_m2_mean)
 print(inf)
 plot(inf) #study 2 is fucked. 
 
 #sd
-inf1 <- influence(m2_SDJanCo)
+inf1 <- influence(a3_m2_sd)
 print(inf1)
 plot(inf1) #study 6 is fucked. 
 ```
@@ -431,64 +437,65 @@ plot(inf1) #study 6 is fucked.
 Funnel plots
 
 ```{r}
-funnel(m2_MJanCo, main = "Random-Effects Model", xlab = "Standardized Mean
+funnel(a3_m2_mean, main = "Random-Effects Model", xlab = "Standardized Mean
 Difference") #something lacking to the left..?
 
-funnel(m2_SDJanCo, main = "Random-Effects Model", xlab = "Standardized Mean
+funnel(a3_m2_sd, main = "Random-Effects Model", xlab = "Standardized Mean
 Difference") #crazy outlier - difficult to interpret. 
 ```
 
 
-#### WITH US, WITHOUT COHEN #### 
+#### a4: WITH US, WITHOUT COHEN #### 
 
-Excluding Cohen
+Excluding Cohen from the third analysis. 
 
 ```{r}
 
-no_cohen <- withoutwithout %>%
+a4_full <- a3_full %>%
   filter(!StudyID %in% c(15))
 
 ```
 
-two models without cohen
+With our study, without Cohen. 
+Dataframe for mean (a4_mean) & for sd (a4_sd)
 
 ```{r}
-mean_no_cohen <- no_cohen %>%
+a4_mean <- a4_full %>%
   filter(yi != 'NA') %>%
   select(StudyID, Article, SAMPLE_SIZE_SZ, SAMPLE_SIZE_HC, PITCH_F0_SZ_M, PITCH_F0_HC_M, PITCH_F0_SZ_SD, PITCH_F0_HC_SD, yi, vi)
 
-sd_no_cohen <- no_cohen %>%
+a4_sd <- a4_full %>%
   filter(yiSD != 'NA') %>%
   select(StudyID, Article, SAMPLE_SIZE_SZ, SAMPLE_SIZE_HC, PITCH_F0SD_SZ_M, PITCH_F0SD_HC_M, PITCH_F0SD_SZ_SD, PITCH_F0SD_HC_SD, yiSD, viSD)
 
 ```
 
-Model for Mean
+Model for Mean:
 --> surprise, surprise. Also significant without Cohen. 
 
 ```{r}
 library(metafor)
-m1_mean <- lmer(yi ~ 1 + (1|StudyID), weights = 1/vi, data=mean_no_cohen,
+a4_m1_mean <- lmer(yi ~ 1 + (1|StudyID), weights = 1/vi, data=a4_mean,
 control=lmerControl(check.nobs.vs.nlev="ignore",
 check.nobs.vs.nRE="ignore"))
 
-m2_mean <- rma(yi, vi, data = mean_no_cohen, slab=Article)
-forest(m2_mean)
+a4_m2_mean <- rma(yi, vi, data = a4_mean, slab=Article)
+forest(a4_m2_mean)
 
 ```
 
 Model for SD 
---> significant without Cohen (fuck that guy) :) :) 
+--> significant without Cohen (as the 2nd analysis)
 
 ```{r}
 
-m1_SD <- lmer(yiSD ~ 1 + (1|StudyID), weights = 1/viSD, data=sd_no_cohen,
+a4_m1_SD <- lmer(yiSD ~ 1 + (1|StudyID), weights = 1/viSD, data=a4_sd,
 control=lmerControl(check.nobs.vs.nlev="ignore",
 check.nobs.vs.nRE="ignore"))
 
-m2_SD <- rma(yiSD, viSD, data = sd_no_cohen, slab=Article)
-forest(m2_SD)
-m2_SD
+a4_m2_SD <- rma(yiSD, viSD, data = a4_sd, slab=Article)
+forest(a4_m2_SD)
+a4_m2_SD
 
 ```
 
@@ -498,8 +505,8 @@ Quality check - Heterogeneity
 
 ```{r}
 
-confint(m2_mean, level = .95) #high
-confint(m2_SD, level = .95) #extreme
+confint(a4_m2_mean, level = .95) #high
+confint(a4_m2_SD, level = .95) #extreme
 
 ```
 
@@ -514,25 +521,27 @@ Figure out why it is very different (is it studying something else).
 ```{r}
 
 #mean
-inf <- influence(m2_mean)
+inf <- influence(a4_m2_mean)
 print(inf)
 plot(inf) #study 2 is fucked. 
 
 #sd
-inf1 <- influence(m2_SD)
+inf1 <- influence(a4_m2_SD)
 print(inf1)
 plot(inf1) #study 6 is fucked. 
 
 ```
 
-Funnelplots - publication bias (needs quantification)
+Funnelplots - publication bias (needs quantification?). 
+--> mean: perhaps lacking studies left of center w. high SE.
+--> sd: looks crazy w. high SE studies to the far left (outliers)
 
 ```{r}
 
-funnel(m2_mean, main = "Random-Effects Model", xlab = "Standardized Mean
+funnel(a4_m2_mean, main = "Random-Effects Model", xlab = "Standardized Mean
 Difference") #still something lacking left with big SE.  
 
-funnel(m2_SD, main = "Random-Effects Model", xlab = "Standardized Mean
+funnel(a4_m2_SD, main = "Random-Effects Model", xlab = "Standardized Mean
 Difference") #looks terrible. 
 
 ```
