@@ -256,6 +256,8 @@ Difference")
 #### TASK 3 ####
 Loading data from assignment 3 & obtaining the data we need to include the three studies from that assignment. 
 
+#### MALTE REVISIONS ####
+
 ```{r}
 #loading the data from assignment 3 
 schizo_data <- read.csv("schizo_data.csv")
